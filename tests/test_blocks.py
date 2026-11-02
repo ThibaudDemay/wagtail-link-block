@@ -54,6 +54,43 @@ class URLValueGetURLTestCase(SimpleTestCase):
         value = self._make_value({"link_to": "page", "page": None, "page_anchor": "team"})
         self.assertIsNone(value.get_url())
 
+    def test_page_with_querystring(self):
+        page = Mock()
+        page.url = "/news/"
+        value = self._make_value(
+            {"link_to": "page", "page": page, "page_querystring": "tag=wagtail"}
+        )
+        self.assertEqual(value.get_url(), "/news/?tag=wagtail")
+
+    def test_page_with_querystring_strips_question_mark(self):
+        page = Mock()
+        page.url = "/news/"
+        value = self._make_value(
+            {"link_to": "page", "page": page, "page_querystring": "?tag=wagtail"}
+        )
+        self.assertEqual(value.get_url(), "/news/?tag=wagtail")
+
+    def test_page_with_querystring_and_anchor(self):
+        page = Mock()
+        page.url = "/news/"
+        value = self._make_value(
+            {
+                "link_to": "page",
+                "page": page,
+                "page_querystring": "tag=wagtail&page=2",
+                "page_anchor": "results",
+            }
+        )
+        self.assertEqual(value.get_url(), "/news/?tag=wagtail&page=2#results")
+
+    def test_page_with_querystring_and_no_page_url(self):
+        page = Mock()
+        page.url = None
+        value = self._make_value(
+            {"link_to": "page", "page": page, "page_querystring": "tag=wagtail"}
+        )
+        self.assertIsNone(value.get_url())
+
     def test_file_with_object(self):
         doc = Mock()
         doc.url = "/documents/report.pdf"
@@ -129,6 +166,7 @@ class LinkBlockCleanTestCase(TestCase):
         defaults = {
             "link_to": link_to,
             "page": None,
+            "page_querystring": "",
             "page_anchor": "",
             "file": None,
             "custom_url": "",
@@ -255,6 +293,26 @@ class LinkBlockCleanTestCase(TestCase):
         result = block.clean(value)
         self.assertEqual(result["anchor"], "top")
         self.assertEqual(result["page_anchor"], "")
+
+    def test_clean_page_with_querystring_valid(self):
+        block = LinkBlock()
+        page = Page.objects.first()
+        value = self._make_block_value(
+            link_to="page", page=page.pk, page_querystring="tag=wagtail", page_anchor="results"
+        )
+        result = block.clean(value)
+        self.assertEqual(result["page"], page)
+        self.assertEqual(result["page_querystring"], "tag=wagtail")
+        self.assertEqual(result["page_anchor"], "results")
+
+    def test_clean_page_querystring_cleared_for_other_types(self):
+        block = LinkBlock()
+        value = self._make_block_value(
+            link_to="custom_url", custom_url="https://example.com", page_querystring="stale"
+        )
+        result = block.clean(value)
+        self.assertEqual(result["custom_url"], "https://example.com")
+        self.assertEqual(result["page_querystring"], "")
 
     def test_clean_page_missing_raises(self):
         block = LinkBlock()

@@ -35,11 +35,16 @@ class URLValue(StructValue):
         if link_to == "page":
             page = self.get(link_to)
             if page:
-                # Append the optional anchor, unless the page has no URL
-                page_anchor = (self.get("page_anchor") or "").lstrip("#")
-                if page.url and page_anchor:
-                    return f"{page.url}#{page_anchor}"
-                return page.url
+                url = page.url
+                # Append the optional querystring and anchor, unless the page has no URL
+                if url:
+                    page_querystring = (self.get("page_querystring") or "").lstrip("?")
+                    page_anchor = (self.get("page_anchor") or "").lstrip("#")
+                    if page_querystring:
+                        url += "?" + page_querystring
+                    if page_anchor:
+                        url += "#" + page_anchor
+                return url
         elif link_to == "file":
             if self.get(link_to):
                 return self.get(link_to).url
@@ -80,6 +85,12 @@ class LinkBlock(StructBlock):
         label=_("Link to"),
     )
     page = PageChooserBlock(required=False, classname="page_link", label=_("Page"))
+    page_querystring = CharBlock(
+        max_length=300,
+        required=False,
+        classname="page_querystring_link",
+        label=_("?"),
+    )
     page_anchor = CharBlock(
         max_length=300,
         required=False,
@@ -135,6 +146,7 @@ class LinkBlock(StructBlock):
 
         url_default_values = {
             "page": None,
+            "page_querystring": "",
             "page_anchor": "",
             "file": None,
             "custom_url": "",
@@ -154,6 +166,7 @@ class LinkBlock(StructBlock):
                 # Remove values added for link types not selected
                 url_default_values.pop(url_type, None)
                 if url_type == "page":
+                    url_default_values.pop("page_querystring")
                     url_default_values.pop("page_anchor")
                 for field in url_default_values:
                     clean_values[field] = url_default_values[field]
